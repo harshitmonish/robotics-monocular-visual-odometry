@@ -31,6 +31,43 @@ The KITTI `sequence/image_0` directory is not present in this checkout. `view_ki
 
 The scripts also assume a KITTI camera calibration (`fx = 718.856`, `cx = 607.1928`, `cy = 185.2157`) in `mono_vo.py`.
 
+## Implementation summary
+
+The project is organized as a small ROS 1 pipeline:
+
+1. `view_kitti.py` reads KITTI sequence images and the matching ground-truth pose rows, then publishes them at the configured frame rate. It publishes images on `/kitti_image` and ground-truth positions on `/kitti_pose`.
+2. `src.py` receives each image and compares it with the previous frame. It calls `monoVO` from `mono_vo.py`, then accumulates valid relative rotations and translation directions into an estimated trajectory. It also receives the ground-truth positions for visualization and preliminary error reporting.
+3. The nodes publish trajectory points as ROS `visualization_msgs/Marker` messages for display in RViz. Blue points represent the estimated trajectory; green points represent ground truth.
+4. `src_cal.py` is a separate calibration utility. It finds a 7-by-6 chessboard pattern in calibration photos and uses OpenCV camera calibration to print an intrinsic matrix.
+
+The visual-odometry calculation uses OpenCV FAST corner detection, pyramidal Lucas–Kanade optical flow to match corners between frames, and an essential matrix with RANSAC followed by pose recovery to estimate relative rotation and translation direction. The camera intrinsics are currently hard-coded to KITTI values. Monocular vision does not provide absolute translation scale, so the accumulated estimate is scale-ambiguous.
+
+### Tools and libraries used
+
+- **Python 3** for the ROS nodes and processing scripts.
+- **ROS 1 / rospy** for nodes, parameters, publishers, and subscribers; **catkin** is used as the workspace build system.
+- **OpenCV (`cv2`)** for FAST features, Lucas–Kanade optical flow, essential-matrix estimation, pose recovery, image handling, and chessboard calibration.
+- **NumPy** for camera matrices and pose-vector operations.
+- **cv_bridge** to convert between ROS image messages and OpenCV images.
+- **ROS message packages**: `sensor_msgs/Image`, `geometry_msgs/TwistStamped` and `Point`, and `visualization_msgs/Marker`.
+- **KITTI odometry sequence 00** as the image and ground-truth pose source; **RViz** for trajectory visualization.
+- **Matplotlib** is imported by the scripts, though trajectory plotting is currently unimplemented.
+
+### Data-flow diagram
+
+```mermaid
+flowchart LR
+    KITTI["KITTI sequence 00<br/>images + ground-truth poses"] --> PLAYER["view_kitti.py<br/>frame-rate playback"]
+    PLAYER -->|"/kitti_image<br/>sensor_msgs/Image"| VO["src.py<br/>ROS visual-odometry node"]
+    PLAYER -->|"/kitti_pose<br/>geometry_msgs/TwistStamped"| VO
+    VO --> TRACK["mono_vo.py<br/>FAST → Lucas–Kanade tracking<br/>essential matrix + recoverPose"]
+    TRACK -->|"relative rotation + translation direction"| VO
+    VO -->|"/kitti_Trajectory_marker<br/>estimated points"| RVIZ["RViz"]
+    VO -->|"/Kitti_ground_Truth_marker<br/>ground-truth points"| RVIZ
+    CAL["Calibration photos"] --> CALNODE["src_cal.py<br/>chessboard calibration"]
+    CALNODE -->|"prints camera matrix"| INTRINSICS["Camera intrinsics<br/>(currently hard-coded in mono_vo.py)"]
+```
+
 ## Build and run
 
 Place this repository's `src` directory in a catkin workspace's `src` directory, then build and source the workspace:
