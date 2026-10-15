@@ -8,7 +8,7 @@ A ROS-based monocular visual odometry coursework project. It tracks FAST feature
 .
 ├── README.md
 ├── pattern.png                 # Calibration target image
-└── src/                        # ROS catkin package (lab4)
+└── src/                        # ROS catkin package (src)
     ├── mono_vo.py              # Feature tracking and relative pose estimation
     ├── src.py                  # VO ROS node and trajectory marker publishing
     ├── view_kitti.py           # KITTI image/pose publisher
