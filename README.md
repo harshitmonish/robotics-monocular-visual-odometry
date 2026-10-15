@@ -8,7 +8,7 @@ A ROS-based monocular visual odometry coursework project. It tracks FAST feature
 .
 ├── README.md
 ├── pattern.png                 # Calibration target image
-└── src/                        # ROS catkin package (lab4)
+└── src/                        # ROS catkin package (src)
     ├── mono_vo.py              # Feature tracking and relative pose estimation
     ├── src.py                  # VO ROS node and trajectory marker publishing
     ├── view_kitti.py           # KITTI image/pose publisher
@@ -78,13 +78,13 @@ catkin_make
 source devel/setup.bash
 ```
 
-The publisher requires a ROS parameter `/fps`; the VO node requires `/lab4/fps`. With the image sequence installed and the workspace sourced, start the nodes in separate terminals:
+The publisher requires a ROS parameter `/fps`; the VO node requires `/src/fps`. With the image sequence installed and the workspace sourced, start the nodes in separate terminals:
 
 ```bash
 rosparam set /fps 10
-rosparam set /lab4/fps 10
-rosrun lab4 view_kitti.py
-rosrun lab4 src.py
+rosparam set /src/fps 10
+rosrun src view_kitti.py
+rosrun src src.py
 ```
 
 The scripts currently live directly in the package directory and are not installed by `CMakeLists.txt`; if `rosrun` cannot find them, run them with Python from `src/` after sourcing ROS and the workspace:
