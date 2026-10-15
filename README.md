@@ -1,25 +1,69 @@
 # Monocular Visual Odometry
 
-This project estimates camera motion from a monocular image sequence and compares the estimated trajectory with ground-truth poses. The helper module detects FAST features, tracks them with pyramidal Lucas–Kanade optical flow, and estimates relative motion from an essential matrix.
+A ROS-based monocular visual odometry coursework project. It tracks FAST features between consecutive camera frames with pyramidal Lucas–Kanade optical flow, estimates relative camera motion from an essential matrix, and publishes estimated and KITTI ground-truth trajectories as RViz markers.
 
-## Contents
+## Repository layout
 
-- `mono_vo.py` contains feature detection/tracking and the `monoVO(frame_0, frame_1, MIN_NUM_FEAT)` helper.
-- `src.py` is the driver scaffold. It describes the intended frame subscription, ground-truth extraction, trajectory plotting, and Absolute Trajectory Error (ATE) calculation.
-- `dataset/pose/00.txt` contains pose data.
-- `dataset/sequence/image_0/` is the image sequence, excluded from Git to avoid committing hundreds of megabytes.
-- The original ROS bag and ZIP archive are large local data copies and should not be committed; the bag exceeds GitHub's 100 MB per-file limit.
+```text
+.
+├── README.md
+├── pattern.png                 # Calibration target image
+└── src/                        # ROS catkin package (lab4)
+    ├── mono_vo.py              # Feature tracking and relative pose estimation
+    ├── src.py                  # VO ROS node and trajectory marker publishing
+    ├── view_kitti.py           # KITTI image/pose publisher
+    ├── src_cal.py              # Chessboard camera calibration utility
+    ├── package.xml
+    ├── CMakeLists.txt
+    ├── dataset/pose/00.txt     # KITTI sequence 00 ground-truth poses
+    ├── images/                 # Calibration photos
+    └── rviz/                   # RViz configurations
+```
+
+The KITTI `sequence/image_0` directory is not present in this checkout. `view_kitti.py` expects the grayscale/color image sequence at `src/dataset/sequence/image_0/` and the pose file at `src/dataset/pose/00.txt`.
 
 ## Requirements
 
-Python 3 is recommended for a fresh setup, with NumPy, OpenCV, and Matplotlib. `src.py` also imports `rospy`, though the visible scaffold does not yet implement its ROS pipeline. The image sequence and pose data must be available under the expected relative paths.
+- ROS 1 with `rospy`, `cv_bridge`, `sensor_msgs`, `geometry_msgs`, and `visualization_msgs`
+- A catkin workspace
+- Python packages: NumPy, OpenCV, and Matplotlib (the calibration utility uses OpenCV)
+- KITTI odometry sequence 00 images, placed at `src/dataset/sequence/image_0/`
 
-## Current state and running
+The scripts also assume a KITTI camera calibration (`fx = 718.856`, `cx = 607.1928`, `cy = 185.2157`) in `mono_vo.py`.
 
-The VO helper is present, but `src.py` is incomplete: `plotTraj` is a stub, `computeError` currently returns zero, and the end-to-end image/pose processing described in the comments is not implemented. Therefore there is no complete run command yet. Complete the driver and provide the data before attempting evaluation.
+## Build and run
 
-`mono_vo.py` expects grayscale image arrays and returns a rotation matrix, translation direction, and a validity flag. Monocular translation has unknown metric scale without additional information; account for this when comparing trajectories.
+Place this repository's `src` directory in a catkin workspace's `src` directory, then build and source the workspace:
 
-## Data and attribution
+```bash
+cd ~/catkin_ws
+catkin_make
+source devel/setup.bash
+```
 
-Large image, bag, and ZIP assets are excluded from this project repository. Retrieve them from the original course source when needed. Confirm the dataset and handout redistribution terms before publishing copies.
+The publisher requires a ROS parameter `/fps`; the VO node requires `/lab4/fps`. With the image sequence installed and the workspace sourced, start the nodes in separate terminals:
+
+```bash
+rosparam set /fps 10
+rosparam set /lab4/fps 10
+rosrun lab4 view_kitti.py
+rosrun lab4 src.py
+```
+
+The scripts currently live directly in the package directory and are not installed by `CMakeLists.txt`; if `rosrun` cannot find them, run them with Python from `src/` after sourcing ROS and the workspace:
+
+```bash
+python3 view_kitti.py
+python3 src.py
+```
+
+`view_kitti.py` publishes `/kitti_image` (`sensor_msgs/Image`) and `/kitti_pose` (`geometry_msgs/TwistStamped`). The VO node subscribes to those topics and publishes `/kitti_Trajectory_marker` and `/Kitti_ground_Truth_marker`. The visualization helper `view_kitti.py` also publishes `/kitti_pose_marker`. RViz configuration files are in `src/rviz/`.
+
+## Current implementation notes
+
+- `mono_vo.py` returns relative rotation, translation direction, and a validity flag based on the minimum tracked-feature threshold. Monocular translation has unknown metric scale, so the estimate cannot directly match metric KITTI positions without scale handling.
+- `view_kitti.py` loops over frames 0 through 1000 and therefore expects at least 1001 images and pose rows.
+- `src.py` contains ROS callbacks and marker publishing, but `plotTraj` is unimplemented and `computeError` is a placeholder. Its `evaluate_error` routine is present but does not perform a standard aligned ATE calculation; treat its printed value as preliminary.
+- `src_cal.py` detects a 7-by-6 chessboard in the JPGs under `src/images/` and prints the resulting camera matrix.
+
+Large dataset archives and ROS bags are not included. Obtain the KITTI images and any course-provided assets from their original source, and check their redistribution terms before publishing copies.
